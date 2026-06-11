@@ -427,39 +427,68 @@ function DashboardScreen({ professor, onLogout, attendanceLog, onManualSave, stu
 // ═══════════════════════════════════════════════════════════════════════════════
 // SCREEN 3 — STUDENT SCREEN
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCREEN 3 — STUDENT SCREEN (CORREGIDO: IP Ó LOCALIZACIÓN)
+// ═══════════════════════════════════════════════════════════════════════════════
 function StudentScreen({ courseId, token, onRegisterSuccess }) {
   const [step, setStep] = useState("validating");
   const [studentId, setStudentId] = useState("");
   const [studentName, setStudentName] = useState("");
   const [checked, setChecked] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // Estado para guardar cómo se validó (IP o GPS) para el banner informativo
+  const [validationMethod, setValidationMethod] = useState("");
 
   const courseObj = COURSES.find(c => c.id === courseId);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const distancia = haversineMetros(pos.coords.latitude, pos.coords.longitude, LAT_UNIVERSIDAD, LON_UNIVERSIDAD);
-            if (distancia <= RANGO_TOLERANCIA_M) {
-              setStep("form");
-            } else {
-              setStep("error");
-              setErrorMsg(`Fuera de rango perimetral permitido (${Math.round(distancia)} metros).`);
-            }
-          },
-          () => {
+    // 1. Simulación de validación de IP institucional 
+    // (Si estás en localhost toma la IP permitida para pruebas; si no, simula una externa)
+    const userIP = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+      ? IP_UNIVERSIDAD 
+      : "186.4.12.34"; 
+
+    const isIpValid = userIP === IP_UNIVERSIDAD;
+
+    // 2. Intentar obtener la Geolocalización (GPS)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const distancia = haversineMetros(pos.coords.latitude, pos.coords.longitude, LAT_UNIVERSIDAD, LON_UNIVERSIDAD);
+          const isGpsValid = distancia <= RANGO_TOLERANCIA_M;
+
+          // LÓGICA FLEXIBLE: Entra si la IP es correcta O si el GPS está en rango
+          if (isIpValid || isGpsValid) {
+            setValidationMethod(isGpsValid ? "GPS Campus UCE" : "Red IP Universitaria");
+            setStep("form");
+          } else {
             setStep("error");
-            setErrorMsg("No se pudo acceder a la geolocalización. Activa los permisos de GPS.");
+            setErrorMsg(`Validación fallida: Te encuentras fuera del rango GPS del campus (${Math.round(distancia)}m) y conectado a una red externa.`);
           }
-        );
+        },
+        // Si el estudiante tiene el GPS apagado, no da permisos o el hardware falla:
+        () => {
+          // Si el GPS falló pero está conectado a la IP de la universidad, ¡lo dejamos pasar!
+          if (isIpValid) {
+            setValidationMethod("Red IP Universitaria (GPS no disponible)");
+            setStep("form");
+          } else {
+            setStep("error");
+            setErrorMsg("No se pudo acceder al GPS y tu dirección IP no pertenece a la Universidad.");
+          }
+        },
+        { timeout: 6000 } // Espera máxima de respuesta del GPS
+      );
+    } else {
+      // Si el navegador es antiguo y no soporta geolocalización, valida únicamente por IP
+      if (isIpValid) {
+        setValidationMethod("Red IP Universitaria");
+        setStep("form");
       } else {
         setStep("error");
-        setErrorMsg("El navegador actual no soporta geolocalización de hardware.");
+        setErrorMsg("El navegador no soporta geolocalización y tu IP no pertenece a la Universidad.");
       }
-    }, 1500);
-    return () => clearTimeout(timer);
+    }
   }, [courseId, token]);
 
   const handleSubmit = (e) => {
@@ -480,18 +509,20 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
       <div style={s.gridOverlay} />
       <div style={s.studentCard}>
         
+        {/* PASO 1: VALIDANDO ENTRADA */}
         {step === "validating" && (
           <div style={{ padding:"40px 24px", textAlign:"center" }}>
             <Spinner size={36} color="#60a5fa" />
-            <h3 style={{ color:"#fff", marginTop:16 }}>Verificando Entorno de Red y GPS</h3>
-            <p style={{ color:"#475569", fontSize:13 }}>Validando coincidencia de IP y cercanía al campus...</p>
+            <h3 style={{ color:"#fff", marginTop:16 }}>Verificando Entorno de Seguridad</h3>
+            <p style={{ color:"#475569", fontSize:13 }}>Validando red IP institucional o cercanía por GPS...</p>
           </div>
         )}
 
+        {/* PASO 2: FORMULARIO AUTORIZADO */}
         {step === "form" && (
           <div style={s.formArea}>
             <div style={s.grantedBanner}>
-              <span>✔ Entorno Seguro Validado. Completa tus datos para finalizar.</span>
+              <span>✔ Acceso Autorizado mediante: <strong>{validationMethod}</strong>.</span>
             </div>
             <h3 style={{ color:"#fff", margin:0 }}>Formulario de Asistencia</h3>
             <p style={{ color:"#60a5fa", fontSize:14, marginBottom:20 }}>{courseObj?.name || courseId}</p>
@@ -523,6 +554,7 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
           </div>
         )}
 
+        {/* PASO 3: REGISTRO EXITOSO */}
         {step === "success" && (
           <div style={s.successCard}>
             <div style={s.successCheck}><Icon.Check /></div>
@@ -531,12 +563,13 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
           </div>
         )}
 
+        {/* PASO 4: ERROR DE ENTORNO */}
         {step === "error" && (
           <div style={{ padding:"40px 24px", textAlign:"center" }}>
-            <div style={{ color:"#ef4444", fontSize:40 }}>✕</div>
+            <div style={{ color:"#ef4444", fontSize:40, marginBottom:10 }}>✕</div>
             <h3 style={{ color:"#fff", marginTop:12 }}>Error de Validación</h3>
-            <p style={{ color:"#f87171", fontSize:14 }}>{errorMsg}</p>
-            <button style={{ ...s.ghostBtn, width:"100%", marginTop:16 }} onClick={() => window.location.reload()}>Reintentar Escaneo</button>
+            <p style={{ color:"#f87171", fontSize:14, lineHeight:"1.4" }}>{errorMsg}</p>
+            <button style={{ ...s.ghostBtn, width:"100%", marginTop:20 }} onClick={() => window.location.reload()}>Reintentar Escaneo</button>
           </div>
         )}
 
@@ -544,7 +577,6 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
     </div>
   );
 }
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN ROOT APPLICATION
 // ═══════════════════════════════════════════════════════════════════════════════
