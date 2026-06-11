@@ -581,42 +581,41 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
 // MAIN ROOT APPLICATION
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [currentProf, setCurrentProf] = useState(null);
+  const [professor, setProfessor] = useState(null);
   const [attendanceLog, setAttendanceLog] = useState([]);
-  const [studentsList, setStudentsList] = useState(MOCK_STUDENTS);
+
+  // 1. EXTRAER PARAMETROS DEL QR DE LA URL
   const { courseId, token } = parseQRParams();
 
-  const handleAttendanceSaved = (newRecord) => {
-    setAttendanceLog(prev => [...prev, newRecord]);
-
-    setStudentsList(prevList => {
-      const exists = prevList.some(s => s.id === newRecord.studentId);
-      if (!exists) {
-        const defaultSessions = {};
-        COURSES.forEach(c => { defaultSessions[c.id] = 0; });
-        return [...prevList, { id: newRecord.studentId, name: newRecord.studentName, sessions: defaultSessions }];
-      }
-      return prevList;
-    });
-  };
-
-  if (courseId && token) {
-    return <StudentScreen courseId={courseId} token={token} onRegisterSuccess={handleAttendanceSaved} />;
+  // 2. ¡PRIMERA PRIORIDAD!: Si la URL tiene 'materia', es un alumno escaneando
+  if (courseId) {
+    return (
+      <StudentScreen 
+        courseId={courseId} 
+        token={token} 
+        onRegisterSuccess={(newRecord) => {
+          // Aquí guardas el registro que viene del alumno
+          setAttendanceLog(prev => [...prev, { ...newRecord, method: "qr" }]);
+        }} 
+      />
+    );
   }
 
-  return currentProf ? (
-    <DashboardScreen
-      professor={currentProf}
+  // 3. SEGUNDA PRIORIDAD: Si no es alumno, procedemos con el flujo del docente
+  if (!professor) {
+    return <LoginScreen onLogin={(prof) => setProfessor(prof)} />;
+  }
+
+  // 4. Si el docente ya inició sesión, ve al Dashboard
+  return (
+    <DashboardScreen 
+      professor={professor} 
       attendanceLog={attendanceLog}
-      studentsList={studentsList}
-      onLogout={() => setCurrentProf(null)}
-      onManualSave={handleAttendanceSaved}
+      onLogout={() => setProfessor(null)}
+      onManualSave={(record) => setAttendanceLog(prev => [...prev, record])}
     />
-  ) : (
-    <LoginScreen onLogin={setCurrentProf} />
   );
 }
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXACT CSS STYLES PRESERVED FROM TXT (Ajustado qrFrame para centrado perfecto)
 // ═══════════════════════════════════════════════════════════════════════════════
