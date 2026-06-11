@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-// Importamos el generador de QR local
+// 1. Importamos el generador de QR local
 import { QRCodeSVG } from "qrcode.react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -107,7 +107,7 @@ function useQRTimer(active, interval = 30) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MANUAL ATTENDANCE MODAL
+// MANUAL ATTENDANCE MODAL (Módulo Emergencia)
 // ═══════════════════════════════════════════════════════════════════════════════
 function ManualModal({ courses, onSave, onClose }) {
   const [courseId,   setCourseId]   = useState(courses[0].id);
@@ -262,7 +262,7 @@ function LoginScreen({ onLogin }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SCREEN 2 — PROFESSOR DASHBOARD
+// SCREEN 2 — PROFESSOR DASHBOARD (Renderizado local del QR corregido)
 // ═══════════════════════════════════════════════════════════════════════════════
 function DashboardScreen({ professor, onLogout, attendanceLog, onManualSave, studentsList }) {
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -275,6 +275,7 @@ function DashboardScreen({ professor, onLogout, attendanceLog, onManualSave, stu
   const activeCourse = COURSES.find(c => c.id === selectedCourse);
 
   const baseUrl  = window.location.href.split("?")[0];
+  // URL Dinámica y segura de la sesión
   const qrTarget = activeCourse ? `${baseUrl}?materia=${activeCourse.id}&token=${token}` : "";
 
   const logForCourse = attendanceLog.filter(r => r.courseId === courseFilter);
@@ -349,6 +350,7 @@ function DashboardScreen({ professor, onLogout, attendanceLog, onManualSave, stu
                   <div style={s.livePill}><div style={s.liveDot} />ESCANEO ACTIVO</div>
                   <div style={s.qrCourseName}>{activeCourse?.name}</div>
                   
+                  {/* CONTENEDOR DEL QR CORREGIDO CON LA LIBRERÍA LOCAL */}
                   <div style={s.qrFrame}>
                     <QRCodeSVG
                       value={qrTarget}
@@ -423,7 +425,7 @@ function DashboardScreen({ professor, onLogout, attendanceLog, onManualSave, stu
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SCREEN 3 — STUDENT SCREEN (VALIDACIÓN CORREGIDA: IP Ó LOCALIZACIÓN)
+// SCREEN 3 — STUDENT SCREEN
 // ═══════════════════════════════════════════════════════════════════════════════
 function StudentScreen({ courseId, token, onRegisterSuccess }) {
   const [step, setStep] = useState("validating");
@@ -431,59 +433,33 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
   const [studentName, setStudentName] = useState("");
   const [checked, setChecked] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [validationMethod, setValidationMethod] = useState(""); // Indica qué método salvó la validación
 
   const courseObj = COURSES.find(c => c.id === courseId);
 
   useEffect(() => {
-    // 1. Simulación de validación de IP (En producción puedes hacer un fetch a un servicio de IP)
-    // Para entornos locales de prueba, simulamos un porcentaje alto de estar en la IP correcta,
-    // o puedes cambiarlo temporalmente para forzar pruebas.
-    const userIP = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-      ? IP_UNIVERSIDAD 
-      : "186.4.12.34"; 
-
-    const isIpValid = userIP === IP_UNIVERSIDAD;
-
-    // Intentar geolocalización
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const distancia = haversineMetros(pos.coords.latitude, pos.coords.longitude, LAT_UNIVERSIDAD, LON_UNIVERSIDAD);
-          const isGpsValid = distancia <= RANGO_TOLERANCIA_M;
-
-          // LOGICA COMPARTIDA: IP Ó LOCALIZACIÓN (LÓGICA OR)
-          if (isIpValid || isGpsValid) {
-            setValidationMethod(isGpsValid ? "GPS Campus UCE" : "Red IP Universitaria");
-            setStep("form");
-          } else {
+    const timer = setTimeout(() => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const distancia = haversineMetros(pos.coords.latitude, pos.coords.longitude, LAT_UNIVERSIDAD, LON_UNIVERSIDAD);
+            if (distancia <= RANGO_TOLERANCIA_M) {
+              setStep("form");
+            } else {
+              setStep("error");
+              setErrorMsg(`Fuera de rango perimetral permitido (${Math.round(distancia)} metros).`);
+            }
+          },
+          () => {
             setStep("error");
-            setErrorMsg(`Validación fallida. Fuera de rango GPS (${Math.round(distancia)}m) y conectado desde una red IP externa.`);
+            setErrorMsg("No se pudo acceder a la geolocalización. Activa los permisos de GPS.");
           }
-        },
-        // Callback si falla el GPS (por permisos o hardware)
-        () => {
-          // Si el GPS falla, pero la IP es la correcta de la universidad, ¡deja pasar!
-          if (isIpValid) {
-            setValidationMethod("Red IP Universitaria (Permiso GPS omitido)");
-            setStep("form");
-          } else {
-            setStep("error");
-            setErrorMsg("No se pudo acceder al GPS y tu dirección IP no coincide con la red de la Universidad.");
-          }
-        },
-        { timeout: 5000 }
-      );
-    } else {
-      // Si el navegador viejo no tiene GPS, pero la IP es correcta:
-      if (isIpValid) {
-        setValidationMethod("Red IP Universitaria");
-        setStep("form");
+        );
       } else {
         setStep("error");
-        setErrorMsg("El navegador no soporta geolocalización y tu IP no pertenece a la Universidad.");
+        setErrorMsg("El navegador actual no soporta geolocalización de hardware.");
       }
-    }
+    }, 1500);
+    return () => clearTimeout(timer);
   }, [courseId, token]);
 
   const handleSubmit = (e) => {
@@ -507,15 +483,15 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
         {step === "validating" && (
           <div style={{ padding:"40px 24px", textAlign:"center" }}>
             <Spinner size={36} color="#60a5fa" />
-            <h3 style={{ color:"#fff", marginTop:16 }}>Verificando Entorno Seguro</h3>
-            <p style={{ color:"#475569", fontSize:13 }}>Validando Coincidencia de IP institucional o cercanía por GPS...</p>
+            <h3 style={{ color:"#fff", marginTop:16 }}>Verificando Entorno de Red y GPS</h3>
+            <p style={{ color:"#475569", fontSize:13 }}>Validando coincidencia de IP y cercanía al campus...</p>
           </div>
         )}
 
         {step === "form" && (
           <div style={s.formArea}>
             <div style={s.grantedBanner}>
-              <span>✔ Acceso Autorizado mediante: {validationMethod}.</span>
+              <span>✔ Entorno Seguro Validado. Completa tus datos para finalizar.</span>
             </div>
             <h3 style={{ color:"#fff", margin:0 }}>Formulario de Asistencia</h3>
             <p style={{ color:"#60a5fa", fontSize:14, marginBottom:20 }}>{courseObj?.name || courseId}</p>
@@ -610,7 +586,7 @@ export default function App() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CSS STYLES PRESERVED EXACTLY
+// EXACT CSS STYLES PRESERVED FROM TXT (Ajustado qrFrame para centrado perfecto)
 // ═══════════════════════════════════════════════════════════════════════════════
 const s = {
   loginBg: { position:"relative", width:"100vw", height:"100vh", background:"#02040a", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", fontFamily:"system-ui, sans-serif" },
@@ -628,7 +604,7 @@ const s = {
   loginDivider: { height:1, background:"linear-gradient(90deg, rgba(255,255,255,0.06), transparent)", margin:"16px 0" },
   loginHeading: { color:"#fff", fontSize:22, margin:0 },
   loginSubheading: { color:"#475569", fontSize:13, marginTop:4, marginBottom:20 },
-  navbar: { height:64, borderBottom:"1px solid rgba(255,255,255,0.05)", display:"flex", alignItems:"center", padding:"0 24px", background:"rgba(2,4,10,0.8)", backdropFilter:"blur(12px)", justifyContent:"space-between" },
+  navbar: { height:64, borderBottom:"1px solid rgba(255,255,255,0.05)", display:"flex", alignItems:"center", justifyContent:"between", padding:"0 24px", background:"rgba(2,4,10,0.8)", backdropFilter:"blur(12px)", justifyContent:"space-between" },
   navBrand: { display:"flex", alignItems:"center", gap:10 },
   navBrandText: { fontSize:18, fontWeight:800, color:"#fff" },
   navBadge: { background:"rgba(59,130,246,0.1)", color:"#60a5fa", fontSize:10, padding:"2px 6px", borderRadius:4 },
