@@ -557,4 +557,134 @@ function StudentScreen({ courseId, token, onRegisterSuccess }) {
 
         {step === "error" && (
           <div style={{ padding:"40px 24px", textAlign:"center" }}>
-            <div style
+            <div style={{ color:"#ef4444", fontSize:40 }}>✕</div>
+            <h3 style={{ color:"#fff", marginTop:12 }}>Error de Validación</h3>
+            <p style={{ color:"#f87171", fontSize:14 }}>{errorMsg}</p>
+            <button style={{ ...s.ghostBtn, width:"100%", marginTop:16 }} onClick={() => window.location.reload()}>Reintentar Escaneo</button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN ROOT APPLICATION
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  const [currentProf, setCurrentProf] = useState(null);
+  const [attendanceLog, setAttendanceLog] = useState([]);
+  const [studentsList, setStudentsList] = useState(MOCK_STUDENTS);
+  const { courseId, token } = parseQRParams();
+
+  const handleAttendanceSaved = (newRecord) => {
+    setAttendanceLog(prev => [...prev, newRecord]);
+
+    setStudentsList(prevList => {
+      const exists = prevList.some(s => s.id === newRecord.studentId);
+      if (!exists) {
+        const defaultSessions = {};
+        COURSES.forEach(c => { defaultSessions[c.id] = 0; });
+        return [...prevList, { id: newRecord.studentId, name: newRecord.studentName, sessions: defaultSessions }];
+      }
+      return prevList;
+    });
+  };
+
+  if (courseId && token) {
+    return <StudentScreen courseId={courseId} token={token} onRegisterSuccess={handleAttendanceSaved} />;
+  }
+
+  return currentProf ? (
+    <DashboardScreen
+      professor={currentProf}
+      attendanceLog={attendanceLog}
+      studentsList={studentsList}
+      onLogout={() => setCurrentProf(null)}
+      onManualSave={handleAttendanceSaved}
+    />
+  ) : (
+    <LoginScreen onLogin={setCurrentProf} />
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CSS STYLES PRESERVED EXACTLY
+// ═══════════════════════════════════════════════════════════════════════════════
+const s = {
+  loginBg: { position:"relative", width:"100vw", height:"100vh", background:"#02040a", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", fontFamily:"system-ui, sans-serif" },
+  dashBg: { position:"relative", width:"100vw", minHeight:"100vh", background:"#02040a", color:"#f8fafc", fontFamily:"system-ui, sans-serif" },
+  studentBg: { position:"relative", width:"100vw", height:"100vh", background:"#02040a", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"system-ui, sans-serif" },
+  gridOverlay: { position:"absolute", inset:0, backgroundImage:"radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px)", backgroundSize:"24px 24px" },
+  glowOrb: { position:"absolute", width:350, height:350, background:"radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", top:"20%", left:"50%", transform:"translate(-50%, -50%)" },
+  loginCard: { position:"relative", width:"100%", maxWidth:400, background:"rgba(10,15,30,0.75)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:16, padding:32, backdropFilter:"blur(16px)" },
+  studentCard: { position:"relative", width:"100%", maxWidth:420, background:"rgba(10,15,30,0.85)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, padding:4, backdropFilter:"blur(20px)" },
+  loginLogo: { display:"flex", alignItems:"center", gap:14 },
+  logoMark: { width:44, height:44, borderRadius:10, background:"linear-gradient(135deg, #3b82f6, #1d4ed8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff" },
+  logoMarkSm: { width:32, height:32, borderRadius:7, background:"linear-gradient(135deg, #3b82f6, #1d4ed8)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff" },
+  logoTitle: { color:"#fff", fontSize:20, fontWeight:800 },
+  logoSub: { color:"#475569", fontSize:11, marginTop:2 },
+  loginDivider: { height:1, background:"linear-gradient(90deg, rgba(255,255,255,0.06), transparent)", margin:"16px 0" },
+  loginHeading: { color:"#fff", fontSize:22, margin:0 },
+  loginSubheading: { color:"#475569", fontSize:13, marginTop:4, marginBottom:20 },
+  navbar: { height:64, borderBottom:"1px solid rgba(255,255,255,0.05)", display:"flex", alignItems:"center", padding:"0 24px", background:"rgba(2,4,10,0.8)", backdropFilter:"blur(12px)", justifyContent:"space-between" },
+  navBrand: { display:"flex", alignItems:"center", gap:10 },
+  navBrandText: { fontSize:18, fontWeight:800, color:"#fff" },
+  navBadge: { background:"rgba(59,130,246,0.1)", color:"#60a5fa", fontSize:10, padding:"2px 6px", borderRadius:4 },
+  navRight: { display:"flex", alignItems:"center", gap:12 },
+  navBtn: { height:36, padding:"0 12px", borderRadius:8, border:"1px solid rgba(255,255,255,0.05)", background:"transparent", color:"#94a3b8", fontSize:13, display:"flex", alignItems:"center", gap:6, cursor:"pointer" },
+  dashMain: { padding:24, maxWidth:1200, margin:"0 auto" },
+  qrLayout: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:24 },
+  qrControls: { background:"rgba(10,15,30,0.4)", border:"1px solid rgba(255,255,255,0.04)", borderRadius:14, padding:24 },
+  sectionTag: { color:"#3b82f6", fontSize:11, fontWeight:700 },
+  dashTitle: { fontSize:28, fontWeight:800, color:"#fff", margin:"8px 0" },
+  titleAccent: { background:"linear-gradient(90deg, #60a5fa, #a855f7)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" },
+  dashSubtitle: { color:"#475569", fontSize:13, margin:"0 0 20px 0" },
+  fieldGroup: { marginBottom:16 },
+  label: { display:"block", color:"#94a3b8", fontSize:12, marginBottom:6 },
+  inputWrapper: { position:"relative", display:"flex", alignItems:"center" },
+  inputIcon: { position:"absolute", left:12, color:"#475569", display:"flex" },
+  input: { width:"100%", height:40, background:"rgba(4,8,18,0.5)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8, padding:"0 12px 0 36px", color:"#fff", outline:"none" },
+  selectWrapper: { position:"relative" },
+  select: { width:"100%", height:40, background:"rgba(4,8,18,0.5)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8, padding:"0 12px", color:"#e2e8f0", outline:"none" },
+  courseCard: { background:"rgba(4,8,18,0.4)", borderRadius:8, padding:12, marginBottom:16, border:"1px solid rgba(255,255,255,0.02)" },
+  courseCardRow: { display:"flex", justifyContent:"space-between", fontSize:13, padding:"4px 0" },
+  startBtn: { width:"100%", height:42, borderRadius:8, border:"none", background:"#3b82f6", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
+  startBtnActive: { background:"#ef4444" },
+  primaryBtn: { width:"100%", height:42, borderRadius:8, border:"none", background:"linear-gradient(135deg, #3b82f6, #1d4ed8)", color:"#fff", fontSize:14, fontWeight:600, cursor:"pointer" },
+  ghostBtn: { height:40, borderRadius:8, border:"1px solid rgba(255,255,255,0.08)", color:"#94a3b8", background:"transparent", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 },
+  warningBtn: { height:40, borderRadius:8, border:"none", background:"#f59e0b", color:"#02040a", fontWeight:700, cursor:"pointer" },
+  errorBanner: { background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.2)", color:"#f87171", padding:10, borderRadius:8, fontSize:13, display:"flex", alignItems:"center", marginBottom:16 },
+  qrDisplayArea: { background:"rgba(10,15,30,0.25)", border:"1px solid rgba(255,255,255,0.03)", borderRadius:14, padding:24, display:"flex", alignItems:"center", justifyContent:"center", minHeight:360 },
+  qrPlaceholder: { display:"flex", flexDirection:"column", alignItems:"center" },
+  qrActiveCard: { width:"100%", maxWidth:320, textAlign:"center" },
+  livePill: { display:"inline-flex", alignItems:"center", gap:6, background:"rgba(34,197,94,0.1)", color:"#22c55e", fontSize:10, padding:"3px 8px", borderRadius:20 },
+  liveDot: { width:6, height:6, borderRadius:"50%", background:"#22c55e" },
+  qrCourseName: { color:"#fff", fontSize:16, fontWeight:700, marginTop:10, marginBottom:16 },
+  qrFrame: { display:"flex", alignItems:"center", justifyContent:"center", width:280, height:280, margin:"0 auto", background:"#040812", borderRadius:8 },
+  timerRow: { marginTop:14 },
+  reportPanel: { background:"rgba(10,15,30,0.3)", border:"1px solid rgba(255,255,255,0.04)", borderRadius:14, padding:24 },
+  reportHeader: { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 },
+  reportTitle: { fontSize:20, fontWeight:800, color:"#fff", margin:0 },
+  tableWrap: { overflowX:"auto" },
+  table: { width:"100%", borderCollapse:"collapse", textAlign:"left" },
+  tableHead: { borderBottom:"1px solid rgba(255,255,255,0.05)" },
+  th: { padding:"12px", color:"#475569", fontSize:12, fontWeight:700 },
+  tr: { borderBottom:"1px solid rgba(255,255,255,0.02)" },
+  td: { padding:"12px", verticalAlign:"middle", color:"#94a3b8", fontSize:14 },
+  idBadge: { fontFamily:"monospace", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)", padding:"2px 6px", borderRadius:4 },
+  progressTrack: { width:80, height:6, background:"rgba(255,255,255,0.05)", borderRadius:3, overflow:"hidden" },
+  progressFill: { height:"100%" },
+  statusPill: { fontWeight:600, fontSize:12 },
+  modalOverlay: { position:"fixed", inset:0, background:"rgba(2,4,10,0.8)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:200 },
+  modalCard: { width:"100%", maxWidth:440, background:"#0b101f", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, overflow:"hidden" },
+  modalHeader: { padding:"14px 20px", borderBottom:"1px solid rgba(255,255,255,0.05)", display:"flex", justifyContent:"space-between", alignItems:"center" },
+  modalTitle: { color:"#fff", fontSize:15, fontWeight:700 },
+  modalSub: { color:"#475569", fontSize:11 },
+  modalClose: { background:"transparent", border:"none", color:"#475569", cursor:"pointer" },
+  formArea: { padding:"24px" },
+  grantedBanner: { background:"rgba(34,197,94,0.06)", border:"1px solid rgba(34,197,94,0.15)", borderRadius:8, padding:10, color:"#22c55e", fontSize:12, marginBottom:16 },
+  successCard: { padding:"32px 16px", textAlign:"center" },
+  successCheck: { width:52, height:52, borderRadius:"50%", background:"rgba(34,197,94,0.1)", border:"1px solid rgba(34,197,94,0.2)", display:"flex", alignItems:"center", justifyContent:"center", color:"#22c55e", margin:"0 auto 12px" }
+};
